@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const speechVoiceSelect = document.getElementById('speech-voice');
   const saveSettingsButton = document.getElementById('save-settings');
   
+  // Initialize TTS module
+  let ttsModule = window.AIReadingAssistantTTS;
+  
   // Load available voices for TTS
   function loadVoices() {
     const voices = window.speechSynthesis.getVoices();
@@ -28,13 +31,25 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   loadVoices();
   
-  // Update range input values
+  // Update range input values and apply immediately for testing
   speechRateInput.addEventListener('input', function() {
-    speechRateValue.textContent = this.value;
+    const rate = parseFloat(this.value);
+    speechRateValue.textContent = rate;
+    
+    // Apply rate to TTS module if available
+    if (ttsModule) {
+      ttsModule.setRate(rate);
+    }
   });
   
   speechPitchInput.addEventListener('input', function() {
-    speechPitchValue.textContent = this.value;
+    const pitch = parseFloat(this.value);
+    speechPitchValue.textContent = pitch;
+    
+    // Apply pitch to TTS module if available
+    if (ttsModule) {
+      ttsModule.setPitch(pitch);
+    }
   });
   
   // Load saved settings
@@ -52,13 +67,78 @@ document.addEventListener('DOMContentLoaded', function() {
     speechPitchInput.value = items.speechPitch;
     speechPitchValue.textContent = items.speechPitch;
     
+    // Apply settings to TTS module if available
+    if (ttsModule) {
+      ttsModule.setRate(items.speechRate);
+      ttsModule.setPitch(items.speechPitch);
+    }
+    
     // Set voice if available
     if (items.speechVoice) {
       setTimeout(() => {
         if (speechVoiceSelect.querySelector(`option[value="${items.speechVoice}"]`)) {
           speechVoiceSelect.value = items.speechVoice;
+          
+          // Apply voice to TTS module if available
+          if (ttsModule) {
+            ttsModule.setVoice(items.speechVoice);
+          }
         }
       }, 100);
+    }
+  });
+  
+  // Add a test button for TTS
+  const testButton = document.createElement('button');
+  testButton.id = 'test-tts';
+  testButton.textContent = 'Test Speech';
+  testButton.style.marginTop = '10px';
+  testButton.style.backgroundColor = '#4285f4';
+  testButton.style.color = 'white';
+  testButton.style.border = 'none';
+  testButton.style.padding = '8px 16px';
+  testButton.style.borderRadius = '4px';
+  testButton.style.cursor = 'pointer';
+  
+  // Add test button to the page
+  const buttonContainer = document.querySelector('.button-container');
+  buttonContainer.appendChild(testButton);
+  
+  // Test TTS functionality
+  testButton.addEventListener('click', function() {
+    if (ttsModule) {
+      const rate = parseFloat(speechRateInput.value);
+      const pitch = parseFloat(speechPitchInput.value);
+      const voice = speechVoiceSelect.value;
+      
+      ttsModule.setRate(rate);
+      ttsModule.setPitch(pitch);
+      
+      if (voice) {
+        ttsModule.setVoice(voice);
+      }
+      
+      // Create a test element for highlighting
+      const testElement = document.createElement('div');
+      testElement.id = 'tts-test-element';
+      testElement.innerHTML = '<p>This is a test of the text-to-speech functionality with highlighting. The speech rate is set to ' + rate + '.</p>';
+      testElement.style.marginTop = '20px';
+      testElement.style.padding = '10px';
+      testElement.style.border = '1px solid #ddd';
+      testElement.style.borderRadius = '4px';
+      
+      // Add or replace the test element
+      const existingElement = document.getElementById('tts-test-element');
+      if (existingElement) {
+        existingElement.parentNode.replaceChild(testElement, existingElement);
+      } else {
+        document.body.appendChild(testElement);
+      }
+      
+      // Speak the test text with highlighting
+      ttsModule.speak(testElement.textContent, testElement);
+    } else {
+      alert('TTS module is not available. Please refresh the page.');
     }
   });
   

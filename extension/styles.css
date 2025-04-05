@@ -256,3 +256,19 @@
     text-align: center;
     padding: 20px;
 }
+
+/* Text-to-Speech Highlighting */
+.tts-highlight {
+    background-color: #ffeb3b;
+    color: #000;
+    border-radius: 2px;
+    padding: 0 2px;
+    display: inline;
+    box-shadow: 0 0 0 2px #ffeb3b;
+    animation: pulse 0.5s infinite alternate;
+}
+
+@keyframes pulse {
+    from { background-color: #ffeb3b; }
+    to { background-color: #ffd600; }
+}

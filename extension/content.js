@@ -128,10 +128,29 @@ function createPopupContainer() {
         document
             .getElementById("ai-popup-tts")
             .addEventListener("click", () => {
-                const content =
-                    document.querySelector(".popup-content").textContent;
+                const contentElement = document.querySelector(".popup-content");
+                const content = contentElement.textContent;
                 if (ttsModule && content) {
-                    ttsModule.speak(content);
+                    // Get settings
+                    chrome.storage.sync.get(
+                        {
+                            speechRate: 1.0,
+                            speechPitch: 1.0,
+                            speechVoice: "",
+                        },
+                        function (items) {
+                            // Configure TTS
+                            ttsModule.setRate(items.speechRate);
+                            ttsModule.setPitch(items.speechPitch);
+
+                            if (items.speechVoice) {
+                                ttsModule.setVoice(items.speechVoice);
+                            }
+
+                            // Read the content with highlighting
+                            ttsModule.speak(content, contentElement);
+                        }
+                    );
                 }
             });
     }
@@ -151,14 +170,44 @@ function getPageContent() {
     );
     if (mainContent) return mainContent.innerText;
 
-    // Fallback to body text, excluding scripts and styles
-    const bodyText = Array.from(
-        document.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li")
-    )
+    // Fallback to body content, excluding scripts, styles, etc.
+    const bodyText = Array.from(document.body.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li"))
         .map((el) => el.innerText)
         .join("\n\n");
 
     return bodyText || document.body.innerText;
+}
+
+// Make an element draggable
+function makeDraggable(element) {
+    const header = element.querySelector(".popup-header, .explanation-header");
+    if (!header) return;
+
+    let isDragging = false;
+    let offsetX, offsetY;
+
+    header.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        offsetX = e.clientX - element.getBoundingClientRect().left;
+        offsetY = e.clientY - element.getBoundingClientRect().top;
+        element.style.cursor = "grabbing";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+
+        const x = e.clientX - offsetX;
+        const y = e.clientY - offsetY;
+
+        element.style.left = `${x}px`;
+        element.style.top = `${y}px`;
+        element.style.transform = "none";
+    });
+
+    document.addEventListener("mouseup", () => {
+        isDragging = false;
+        element.style.cursor = "";
+    });
 }
 
 // Summarize article
@@ -166,6 +215,7 @@ function summarizeArticle() {
     const popup = createPopupContainer();
     popup.classList.add("active");
 
+    // Get page content
     const content = getPageContent();
 
     // Get summary mode from settings
@@ -204,6 +254,7 @@ function extractKeyPoints() {
     const popup = createPopupContainer();
     popup.classList.add("active");
 
+    // Get page content
     const content = getPageContent();
 
     // Send message to background script to get key points
@@ -253,47 +304,36 @@ function explainSelection() {
         return;
     }
 
-    // Get surrounding context
-    let context = "";
-    if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const container = range.commonAncestorContainer;
+    // Create explanation popup
+    let popup = document.querySelector(".ai-reading-assistant-explanation");
 
-        // Get paragraph or nearest block element
-        const contextElement =
-            container.nodeType === Node.TEXT_NODE
-                ? container.parentElement
-                : container;
+    if (!popup) {
+        popup = document.createElement("div");
+        popup.className = "ai-reading-assistant-explanation";
+        popup.innerHTML = `
+      <button class="explanation-close">&times;</button>
+      <div class="explanation-content">
+        <div class="loading-spinner">Loading...</div>
+      </div>
+    `;
+        document.body.appendChild(popup);
 
-        if (contextElement) {
-            context = contextElement.innerText;
-        }
+        // Make popup draggable
+        makeDraggable(popup);
+
+        // Add close button event listener
+        popup.querySelector(".explanation-close").addEventListener("click", () => {
+            popup.remove();
+        });
     }
 
-    // Create explanation popup
-    const popup = document.createElement("div");
-    popup.className = "ai-reading-assistant-explanation";
-    popup.innerHTML = `
-    <div class="explanation-content">
-      <div class="loading-spinner">Loading...</div>
-    </div>
-    <button class="explanation-close">×</button>
-  `;
+    // Position popup near the selection
+    const selectionRect = selection.getRangeAt(0).getBoundingClientRect();
+    popup.style.left = `${selectionRect.left + window.scrollX}px`;
+    popup.style.top = `${selectionRect.bottom + window.scrollY + 10}px`;
 
-    // Position popup near selection
-    const rect = selection.getRangeAt(0).getBoundingClientRect();
-    popup.style.left = `${rect.left + window.scrollX}px`;
-    popup.style.top = `${rect.bottom + window.scrollY + 10}px`;
-
-    document.body.appendChild(popup);
-
-    // Make explanation popup draggable
-    makeDraggable(popup);
-
-    // Add close button event listener
-    popup.querySelector(".explanation-close").addEventListener("click", () => {
-        popup.remove();
-    });
+    // Get surrounding context
+    const context = getSelectionContext(selection);
 
     // Send message to background script to get explanation
     chrome.runtime.sendMessage(
@@ -332,6 +372,8 @@ function readAloud() {
 
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
+    let textToRead;
+    let elementToHighlight;
 
     // Get settings
     chrome.storage.sync.get(
@@ -351,12 +393,59 @@ function readAloud() {
 
             // Read selected text or page content
             if (selectedText) {
-                ttsModule.speak(selectedText);
+                textToRead = selectedText;
+                // Get the element containing the selection
+                const range = selection.getRangeAt(0);
+                elementToHighlight = range.commonAncestorContainer;
+                
+                // If it's a text node, use its parent
+                if (elementToHighlight.nodeType === Node.TEXT_NODE) {
+                    elementToHighlight = elementToHighlight.parentNode;
+                }
             } else {
-                ttsModule.speak(getPageContent());
+                // Try to get the main content element
+                const article = document.querySelector("article");
+                const mainContent = document.querySelector(
+                    "main, #content, .content, .article, .post"
+                );
+                
+                if (article) {
+                    textToRead = article.innerText;
+                    elementToHighlight = article;
+                } else if (mainContent) {
+                    textToRead = mainContent.innerText;
+                    elementToHighlight = mainContent;
+                } else {
+                    textToRead = getPageContent();
+                    elementToHighlight = document.body;
+                }
             }
+
+            // Read the text with highlighting
+            ttsModule.speak(textToRead, elementToHighlight);
         }
     );
+}
+
+// Get context around the selection
+function getSelectionContext(selection) {
+    if (!selection.rangeCount) return "";
+
+    const range = selection.getRangeAt(0);
+    const startNode = range.startContainer;
+
+    // Try to get the paragraph or nearest block element
+    let contextNode = startNode;
+    while (
+        contextNode &&
+        contextNode.nodeType !== Node.ELEMENT_NODE &&
+        contextNode !== document.body
+    ) {
+        contextNode = contextNode.parentNode;
+    }
+
+    // Get text from the context node
+    return contextNode ? contextNode.textContent.trim() : "";
 }
 
 // Open settings popup
@@ -398,64 +487,10 @@ function init() {
 
             if (isNewsOrBlog) {
                 // Auto-summarize after a delay
-                setTimeout(summarizeArticle, 2000);
+                setTimeout(summarizeArticle, 1500);
             }
         }
     });
-}
-
-// Make an element draggable
-function makeDraggable(element) {
-    let pos1 = 0,
-        pos2 = 0,
-        pos3 = 0,
-        pos4 = 0;
-
-    // Add a draggable handle if it's the toolbar
-    if (element.classList.contains("ai-reading-assistant-toolbar")) {
-        // Use the entire toolbar as the drag handle
-        element.onmousedown = dragMouseDown;
-    } else if (element.classList.contains("ai-reading-assistant-popup")) {
-        // Use the header as the drag handle for popups
-        const header = element.querySelector(".popup-header");
-        if (header) {
-            header.style.cursor = "move";
-            header.onmousedown = dragMouseDown;
-        }
-    } else if (element.classList.contains("ai-reading-assistant-explanation")) {
-        // Use the entire explanation popup as the drag handle
-        element.onmousedown = dragMouseDown;
-    }
-
-    function dragMouseDown(e) {
-        e = e || window.event;
-        e.preventDefault();
-        // Get the mouse cursor position at startup
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        // Call a function whenever the cursor moves
-        document.onmousemove = elementDrag;
-    }
-
-    function elementDrag(e) {
-        e = e || window.event;
-        e.preventDefault();
-        // Calculate the new cursor position
-        pos1 = pos3 - e.clientX;
-        pos2 = pos4 - e.clientY;
-        pos3 = e.clientX;
-        pos4 = e.clientY;
-        // Set the element's new position
-        element.style.top = element.offsetTop - pos2 + "px";
-        element.style.left = element.offsetLeft - pos1 + "px";
-    }
-
-    function closeDragElement() {
-        // Stop moving when mouse button is released
-        document.onmouseup = null;
-        document.onmousemove = null;
-    }
 }
 
 // Initialize when DOM is fully loaded
@@ -464,3 +499,10 @@ if (document.readyState === "loading") {
 } else {
     init();
 }
+
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+    if (request.action === "getPageContent") {
+        sendResponse({ content: getPageContent() });
+    }
+});
