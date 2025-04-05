@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Reading Assistant</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="popup-container">
+    <h1>AI Reading Assistant</h1>
+    
+    <div class="settings-section">
+      <h2>Summary Settings</h2>
+      <div class="setting-item">
+        <label for="summary-mode">Summary Mode:</label>
+        <select id="summary-mode">
+          <option value="brief">Brief</option>
+          <option value="detailed">Detailed</option>
+          <option value="bullets">Bullet Points</option>
+        </select>
+      </div>
+      
+      <div class="setting-item">
+        <label for="auto-popup">Auto Popup for News/Blogs:</label>
+        <input type="checkbox" id="auto-popup">
+      </div>
+    </div>
+    
+    <div class="settings-section">
+      <h2>Text-to-Speech Settings</h2>
+      <div class="setting-item">
+        <label for="speech-rate">Speech Rate:</label>
+        <input type="range" id="speech-rate" min="0.5" max="2" step="0.1" value="1">
+        <span id="speech-rate-value">1.0</span>
+      </div>
+      
+      <div class="setting-item">
+        <label for="speech-pitch">Speech Pitch:</label>
+        <input type="range" id="speech-pitch" min="0.5" max="2" step="0.1" value="1">
+        <span id="speech-pitch-value">1.0</span>
+      </div>
+      
+      <div class="setting-item">
+        <label for="speech-voice">Voice:</label>
+        <select id="speech-voice"></select>
+      </div>
+    </div>
+    
+    <div class="button-container">
+      <button id="save-settings">Save Settings</button>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
