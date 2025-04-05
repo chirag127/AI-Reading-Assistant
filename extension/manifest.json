@@ -26,7 +26,8 @@
       ],
       "js": [
         "draggable.js",
-        "content.js"
+        "content.js",
+        "tts.js"
       ],
       "css": [
         "styles.css"
