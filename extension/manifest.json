@@ -3,8 +3,14 @@
   "name": "AI Reading Assistant",
   "version": "1.0.0",
   "description": "Enhance web reading with AI-powered summarization, key points, explanations, and TTS",
-  "permissions": ["activeTab", "storage", "scripting"],
-  "host_permissions": ["http://localhost:3000/*"],
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://ai-reading-assistant.onrender.com/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -15,9 +21,16 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["styles.css"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "draggable.js",
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ]
     }
   ],
   "background": {
@@ -30,8 +43,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["tts.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "tts.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
